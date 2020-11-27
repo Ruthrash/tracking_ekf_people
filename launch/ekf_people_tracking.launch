@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<launch>
+
+
+    <rosparam>use_sim_time: true</rosparam>
+    <!-- Person Detection 
+    <include file="$(find darknet_ros)/launch/darknet_ros_sim.launch"/>-->
+
+    <!-- Register Depth and RGB image -->
+    <include file="$(find extrinsic_calibration)/launch/register_depth_sim.launch">
+    </include>
+ 
+  
+  <!-- segments depth image using 2d bounding box
+  <node pkg="det_and_tracking" type="boundingboxpoints" name="yolo_depth_segmentation"/>-->
+
+<!-- Publishes 3D Detection as markers -->
+<!--Modify this to use rectified information from gazebo directly and bounding box information from YOLO -->  
+ <node pkg="tracking_ekf_people" type="main" name="main"  output="screen" > 
+  <param name="cluster_tolerance" value="0.03"/>
+<param name="min_cluster_size" value="500"/>
+<param name="max_cluster_size" value="6500"/>
+
+</node>
+
+
+
+<param name="prediction_noise" value="5"/>
+<param name="observation_noise" value="0.5"/>
+<param name="velocity_noise" value="3"/>
+
+
+<!--Uses rviz Markers as detections and tracks the bounding box 
+<node pkg="det_and_tracking" type="kalmanfilter_wface" name="kalmanfilter_wface"/> -->
+<!--<node pkg="rviz" type="rviz" name="visualization"/>-->
+</launch>
