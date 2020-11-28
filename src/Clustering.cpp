@@ -3,8 +3,9 @@
 Clustering::Clustering(){}
 Clustering::~Clustering(){}
 
-Clustering::Clustering(ros::NodeHandle &node) : nh{node}
+Clustering::Clustering(ros::NodeHandle &node)  
 {
+    nh = node;
     bbox_viz_pub = node.advertise<visualization_msgs::MarkerArray> ("/person_bounding_boxes",1,true);
 }
 
@@ -38,19 +39,15 @@ visualization_msgs::Marker Clustering::GetPersonBoundingBoxes(const sensor_msgs:
 {
     std::cout<<"Trying clustering\n";
     // Container for original & filtered data
-    pcl::PCLPointCloud2* cloud = new pcl::PCLPointCloud2;
-    pcl::PCLPointCloud2ConstPtr cloudPtr(cloud);
-    pcl::PCLPointCloud2* cloud_filtered = new pcl::PCLPointCloud2;
-    pcl::PCLPointCloud2Ptr cloudFilteredPtr (cloud_filtered);
+    pcl::PCLPointCloud2* cloud = new pcl::PCLPointCloud2; pcl::PCLPointCloud2ConstPtr cloudPtr(cloud);
+    pcl::PCLPointCloud2* cloud_filtered = new pcl::PCLPointCloud2;  pcl::PCLPointCloud2Ptr cloudFilteredPtr (cloud_filtered);
 
     // Convert to PCL data type
     pcl_conversions::toPCL(*cloud_msg, *cloud);
 
     // Perform voxel grid downsampling filtering
     pcl::VoxelGrid<pcl::PCLPointCloud2> sor;
-    sor.setInputCloud (cloudPtr);
-    sor.setLeafSize (0.01, 0.01, 0.01);
-    sor.filter (*cloudFilteredPtr);//cloudFilteredPtr has voxelised pointcloud
+    sor.setInputCloud (cloudPtr); sor.setLeafSize (0.01, 0.01, 0.01); sor.filter (*cloudFilteredPtr);//cloudFilteredPtr has voxelised pointcloud
 
     pcl::PointCloud<pcl::PointXYZ> *xyz_cloud = new pcl::PointCloud<pcl::PointXYZ>;
     pcl::PointCloud<pcl::PointXYZ>::Ptr xyzCloudPtr (xyz_cloud); // need a boost shared pointer for pcl function inputs
@@ -64,29 +61,28 @@ visualization_msgs::Marker Clustering::GetPersonBoundingBoxes(const sensor_msgs:
     tree->setInputCloud (xyzCloudPtr);
 
     // create the extraction object for the clusters
-    std::vector<pcl::PointIndices> cluster_indices;
-    pcl::EuclideanClusterExtraction<pcl::PointXYZ> ec;
+    std::vector<pcl::PointIndices> cluster_indices; pcl::EuclideanClusterExtraction<pcl::PointXYZ> ec;
     // specify euclidean cluster parameters
     float cluster_tolerance = 0.03 , min_cluster_size = 500, max_cluster_size = 6500;
-    //nh.getParam("cluster_tolerance",cluster_tolerance);
-    //nh.getParam("min_cluster_size",min_cluster_size);
-    //nh.getParam("max_cluster_size",max_cluster_size);
-    ec.setClusterTolerance (cluster_tolerance); // 2cm
-    ec.setMinClusterSize (min_cluster_size);
-    ec.setMaxClusterSize (max_cluster_size);
+    nh.getParam("cluster_tolerance",cluster_tolerance);
+    nh.getParam("min_cluster_size",min_cluster_size);
+    nh.getParam("max_cluster_size",max_cluster_size);
+    
+    // exctract the indices pertaining to each cluster and store in a vector of pcl::PointIndices
+    ec.setClusterTolerance (cluster_tolerance); ec.setMinClusterSize (min_cluster_size); ec.setMaxClusterSize (max_cluster_size);
     std::cout<<min_cluster_size<<", "<<max_cluster_size<<", "<<cluster_tolerance<<std::endl;
     ec.setSearchMethod (tree);
     ec.setInputCloud (xyzCloudPtr);
-    // exctract the indices pertaining to each cluster and store in a vector of pcl::PointIndices
     ec.extract (cluster_indices);
 
     // declare the output variable instances
-    //sensor_msgs::PointCloud2 output;
+    sensor_msgs::PointCloud2 output;
     pcl::PCLPointCloud2 outputPCL;
     int count = 0;
     float max;//to get cluster with maximum size
+    visualization_msgs::MarkerArray marker_array_;
     visualization_msgs::Marker max_object_marker;//to get object marker of maximum size cluster
-    //sensor_msgs::PointCloud2 max_cloud_msg; 
+    sensor_msgs::PointCloud2 max_cloud_msg; 
     
     std::cout<<cluster_indices.size()<<"fasdf\n";
     // here, cluster_indices is a vector of indices for each cluster. iterate through each indices object to work with them seporately
@@ -114,22 +110,26 @@ visualization_msgs::Marker Clustering::GetPersonBoundingBoxes(const sensor_msgs:
         float size = abs(object_marker.scale.x+object_marker.scale.y+object_marker.scale.z);
         pcl::toPCLPointCloud2( *clusterPtr ,outputPCL);
         // Convert to ROS data type
-        //pcl_conversions::fromPCL(outputPCL, output);
+        pcl_conversions::fromPCL(outputPCL, output);
         if(it==cluster_indices.begin())
         {
             max = abs(object_marker.scale.x+object_marker.scale.y+object_marker.scale.z);
             max_object_marker = object_marker;
-            //max_cloud_msg = output;
+            max_cloud_msg = output;
         }
-        else if(size > max && abs(object_marker.pose.position.y) <= 0.5)
+        else if(size > max )//&& abs(object_marker.pose.position.y) <= 0.5)
         {
             max_object_marker = object_marker;
             max = abs(object_marker.scale.x+object_marker.scale.y+object_marker.scale.z); 
-            //max_cloud_msg = output;
+            max_cloud_msg = output;
+            marker_array_.markers.push_back(object_marker);
         }
+        
         std::cout<<"size= "<<max<<"\n";
+        std::cout<<"frame_id= "<<cloud_msg->header.frame_id<<"\n";
 
     }
+    PublishBoxesArray(marker_array_);
     return max_object_marker;
 
 }

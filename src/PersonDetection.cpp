@@ -5,12 +5,12 @@ PersonDetection::~PersonDetection(){}
 
 PersonDetection::PersonDetection(ros::NodeHandle &node) : Clustering(node)
 {
-    yolo_sync_sub.subscribe(node, "/darknet_ros/bounding_boxes",1);
-    depth_sync_sub.subscribe(node, "/pepper_robot/camera/depth_registered/image_rect",1);
+    yolo_sync_sub.subscribe(node, "/darknet_ros/bounding_boxes",200);
+    depth_sync_sub.subscribe(node, "/pepper_robot/camera/depth_registered/image_rect",200);
     std::cout<<"running corrections \n";
-    sync_.reset(new Sync(MySyncPolicy(10), yolo_sync_sub, depth_sync_sub));
+    sync_.reset(new Sync(MySyncPolicy(1000), yolo_sync_sub, depth_sync_sub));
     sync_->registerCallback(boost::bind(&PersonDetection::SyncYOLODepthCB, this, _1, _2));
-    depth_info_sub = node.subscribe("/pepper_robot/camera/depth/camera_info", 1, &PersonDetection::DepthInfoCB, this);
+    depth_info_sub = node.subscribe("/pepper_robot/camera/depth_registered/camera_info", 1, &PersonDetection::DepthInfoCB, this);
 }
 
 void PersonDetection::DepthInfoCB(const sensor_msgs::CameraInfo &depth_info_msg)
@@ -27,10 +27,11 @@ void PersonDetection::SyncYOLODepthCB(const darknet_ros_msgs::BoundingBoxes::Con
     {
         if(bb->bounding_boxes[i].Class == "person")
         {
-            std::cout<<"persons\n";
+            std::cout<<depth_msg->header.stamp<<" persons\n";
         
             //get each person detection as a XYZ pointcloud
             sensor_msgs::PointCloud2::Ptr cloud_msg(new sensor_msgs::PointCloud2);
+            std::cout<<"frame id depth "<<depth_msg->header.frame_id<<"\n";
             cloud_msg->header = depth_msg->header;
             cloud_msg->height = depth_msg->height;
             cloud_msg->width  = depth_msg->width;
@@ -53,63 +54,84 @@ void PersonDetection::SyncYOLODepthCB(const darknet_ros_msgs::BoundingBoxes::Con
                 ROS_INFO("Depth image has unsupported encoding [%s]", depth_msg->encoding.c_str());
                 return;
             }
-            marker_array.markers.push_back(Clustering::GetPersonBoundingBoxes(cloud_msg));
+            visualization_msgs::Marker marker_ = Clustering::GetPersonBoundingBoxes(cloud_msg);
+            //marker_array.markers.push_back(marker_);
+           // marker_array.header = marker_.header;
         }
     }
-    Clustering::PublishBoxesArray(marker_array);
+    //Clustering::PublishBoxesArray(marker_array);
 }
 
 
 
 
-// Handles float or uint16 depths
+/*
 template<typename T>
-void PersonDetection::CreatePointCloud(const sensor_msgs::ImageConstPtr& depth_msg, sensor_msgs::PointCloud2::Ptr& cloud_msg, const image_geometry::PinholeCameraModel& depth_model_, const darknet_ros_msgs::BoundingBox& bb, double range_max)
+void RegisterNodelet::convert(const sensor_msgs::ImageConstPtr& depth_msg,
+                              const sensor_msgs::ImagePtr& registered_msg,
+                              const Eigen::Affine3d& depth_to_rgb)
 {
-    // Use correct principal point from calibration
-    float center_x = depth_model_.cx();
-    float center_y = depth_model_.cy();
+  // Allocate memory for registered depth image
+  registered_msg->step = registered_msg->width * sizeof(T);
+  registered_msg->data.resize( registered_msg->height * registered_msg->step );
+  // data is already zero-filled in the uint16 case, but for floats we want to initialize everything to NaN.
+  DepthTraits<T>::initializeBuffer(registered_msg->data);
 
-    // Combine unit conversion (if necessary) with scaling by focal length for computing (X,Y)
-    double unit_scaling = DepthTraits<T>::toMeters( T(1) );
-    float constant_x = unit_scaling / depth_model_.fx();
-    float constant_y = unit_scaling / depth_model_.fy();
-    float bad_point = std::numeric_limits<float>::quiet_NaN();
-
-    sensor_msgs::PointCloud2Iterator<float> iter_x(*cloud_msg, "x");
-    sensor_msgs::PointCloud2Iterator<float> iter_y(*cloud_msg, "y");
-    sensor_msgs::PointCloud2Iterator<float> iter_z(*cloud_msg, "z");
-    const T* depth_row = reinterpret_cast<const T*>(&depth_msg->data[0]);
-    int row_step = depth_msg->step / sizeof(T);
-    for (int v = 0; v < (int)cloud_msg->height; ++v, depth_row += row_step)
+  // Extract all the parameters we need
+  double inv_depth_fx = 1.0 / depth_model_.fx();
+  double inv_depth_fy = 1.0 / depth_model_.fy();
+  double depth_cx = depth_model_.cx(), depth_cy = depth_model_.cy();
+  double depth_Tx = depth_model_.Tx(), depth_Ty = depth_model_.Ty();
+  double rgb_fx = rgb_model_.fx(), rgb_fy = rgb_model_.fy();
+  double rgb_cx = rgb_model_.cx(), rgb_cy = rgb_model_.cy();
+  //double rgb_fx = 2740139509 , rgb_fy = 275.74184670;
+  //double rgb_cx = 141.1319308, rgb_cy = 106.39174605;
+  double rgb_Tx = rgb_model_.Tx(), rgb_Ty = rgb_model_.Ty();
+  //std::cout<<rgb_fx<<", "rgb_fy<<", "<<rgb_Tx<<", "<<rgb_Ty<<", "rgb_cx<<", "<<rgb_cy<<std::endl;
+  
+  // Transform the depth values into the RGB frame
+  /// @todo When RGB is higher res, interpolate by rasterizing depth triangles onto the registered image  
+  const T* depth_row = reinterpret_cast<const T*>(&depth_msg->data[0]);
+  int row_step = depth_msg->step / sizeof(T);
+  T* registered_data = reinterpret_cast<T*>(&registered_msg->data[0]);
+  int raw_index = 0;
+  for (unsigned v = 0; v < depth_msg->height; ++v, depth_row += row_step)
+  {
+    for (unsigned u = 0; u < depth_msg->width; ++u, ++raw_index)
     {
-        for (int u = 0; u < (int)cloud_msg->width; ++u, ++iter_x, ++iter_y, ++iter_z)
-        {
-        T depth = depth_row[u];
+      T raw_depth = depth_row[u];
+      if (!DepthTraits<T>::valid(raw_depth))
+        continue;
+      
+      double depth = DepthTraits<T>::toMeters(raw_depth);
 
-        // Missing points denoted by NaNs
-        if (!DepthTraits<T>::valid(depth))
-        {
-            if (range_max != 0.0)
-            {
-            depth = DepthTraits<T>::fromMeters(range_max);
-            }
-            else
-            {
-            *iter_x = *iter_y = *iter_z = bad_point;
-            continue;
-            }
-        }
+      /// @todo Combine all operations into one matrix multiply on (u,v,d)
+      // Reproject (u,v,Z) to (X,Y,Z,1) in depth camera frame
+      Eigen::Vector4d xyz_depth;
+      xyz_depth << ((u - depth_cx)*depth - depth_Tx) * inv_depth_fx,
+                   ((v - depth_cy)*depth - depth_Ty) * inv_depth_fy,
+                   depth,
+                   1;
 
-        // Fill in XYZ
-        *iter_x = (u - center_x) * depth * constant_x;
-        *iter_y = (v - center_y) * depth * constant_y;
-        *iter_z = DepthTraits<T>::toMeters(depth);
-        }
+      // Transform to RGB camera frame
+      Eigen::Vector4d xyz_rgb = depth_to_rgb * xyz_depth;
+
+      // Project to (u,v) in RGB image
+      double inv_Z = 1.0 / xyz_rgb.z();
+      int u_rgb = (rgb_fx*xyz_rgb.x() + rgb_Tx)*inv_Z + rgb_cx + 0.5;
+      int v_rgb = (rgb_fy*xyz_rgb.y() + rgb_Ty)*inv_Z + rgb_cy + 0.5;
+      
+      if (u_rgb < 0 || u_rgb >= (int)registered_msg->width ||
+          v_rgb < 0 || v_rgb >= (int)registered_msg->height)
+        continue;
+      
+      T& reg_depth = registered_data[v_rgb*registered_msg->width + u_rgb];
+      T  new_depth = DepthTraits<T>::fromMeters(xyz_rgb.z());
+      // Validity and Z-buffer checks
+      if (!DepthTraits<T>::valid(reg_depth) || reg_depth > new_depth)
+        reg_depth = new_depth;
     }
-}
-
-
-
+  }
+}*/
 
 

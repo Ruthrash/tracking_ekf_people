@@ -143,6 +143,7 @@ include_directories(
 
 
 add_library(${PROJECT_NAME}
+  "src/DepthImageProc.cpp"
   "src/PersonDetection.cpp"
   "src/EKF.cpp"
   "src/Clustering.cpp"
@@ -156,12 +157,15 @@ add_dependencies(${PROJECT_NAME}
 )
 
 
-## Build the PersonDetection class
-add_executable(person_detection
-  "src/PersonDetection.cpp"
+
+
+
+## Build the DepthImageProc class
+add_executable(depth_image_proc
+  "src/DepthImageProc.cpp"
 )
 
-target_link_libraries(person_detection
+target_link_libraries(depth_image_proc
   ${PROJECT_NAME}
   ${EXTERNAL_LIBS}
   ${catkin_LIBRARIES}
@@ -204,7 +208,16 @@ target_link_libraries(clustering
 
 
 
+## Build the PersonDetection class
+add_executable(person_detection
+  "src/PersonDetection.cpp"
+)
 
+target_link_libraries(person_detection
+  ${PROJECT_NAME}
+  ${EXTERNAL_LIBS}
+  ${catkin_LIBRARIES}
+)
 
 
 
