@@ -14,8 +14,8 @@
   
   <!-- segments depth image using 2d bounding box
   <node pkg="det_and_tracking" type="boundingboxpoints" name="yolo_depth_segmentation"/>-->
-  <param name="cluster_tolerance" value="0.5"/>
-<param name="min_cluster_size" value="500"/>
+  <param name="cluster_tolerance" value="0.01"/>
+<param name="min_cluster_size" value="100"/>
 <param name="max_cluster_size" value="6500"/>
 <!-- Publishes 3D Detection as markers -->
 <!--Modify this to use rectified information from gazebo directly and bounding box information from YOLO -->  

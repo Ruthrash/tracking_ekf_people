@@ -36,11 +36,13 @@ protected:
     void GetAxisAlignedBoundingBox(pcl::PointCloud<pcl::PointXYZ>::ConstPtr cloud, geometry_msgs::Pose* pose, geometry_msgs::Vector3* dimensions);
     visualization_msgs::Marker GetPersonBoundingBoxes(const sensor_msgs::PointCloud2ConstPtr& cloud_msg);
     void PublishBoxesArray(const visualization_msgs::MarkerArray &boxes);
+    void PersonCloud(const sensor_msgs::PointCloud2 &cloud_msg);
 
 private:
 
     ros::NodeHandle nh;
     ros::Publisher bbox_viz_pub; 
+    ros::Publisher person_pcl_pub; 
 
 
 

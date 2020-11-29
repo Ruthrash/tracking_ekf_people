@@ -7,11 +7,16 @@ Clustering::Clustering(ros::NodeHandle &node)
 {
     nh = node;
     bbox_viz_pub = node.advertise<visualization_msgs::MarkerArray> ("/person_bounding_boxes",1,true);
+    person_pcl_pub = node.advertise<sensor_msgs::PointCloud2> ("/person_cloud",1,true);
 }
 
 void Clustering::PublishBoxesArray(const visualization_msgs::MarkerArray &boxes)
 {
     bbox_viz_pub.publish(boxes);
+}
+void Clustering::PersonCloud(const sensor_msgs::PointCloud2 &cloud_msg)
+{
+    person_pcl_pub.publish(cloud_msg);
 }
 
 
@@ -108,23 +113,22 @@ visualization_msgs::Marker Clustering::GetPersonBoundingBoxes(const sensor_msgs:
         object_marker.color.a = 0.3;
         GetAxisAlignedBoundingBox(clusterPtr, &object_marker.pose, &object_marker.scale);//gets a bounding box for all clusters of PCL within YOLO boudning box
         float size = abs(object_marker.scale.x+object_marker.scale.y+object_marker.scale.z);
-        pcl::toPCLPointCloud2( *clusterPtr ,outputPCL);
+        //pcl::toPCLPointCloud2( *clusterPtr ,outputPCL);
         // Convert to ROS data type
-        pcl_conversions::fromPCL(outputPCL, output);
+        //pcl_conversions::fromPCL(outputPCL, output);
         if(it==cluster_indices.begin())
         {
             max = abs(object_marker.scale.x+object_marker.scale.y+object_marker.scale.z);
             max_object_marker = object_marker;
-            max_cloud_msg = output;
+            //max_cloud_msg = output;
         }
         else if(size > max )//&& abs(object_marker.pose.position.y) <= 0.5)
         {
             max_object_marker = object_marker;
             max = abs(object_marker.scale.x+object_marker.scale.y+object_marker.scale.z); 
-            max_cloud_msg = output;
-            marker_array_.markers.push_back(object_marker);
+            //max_cloud_msg = output;
         }
-        
+        marker_array_.markers.push_back(object_marker);
         std::cout<<"size= "<<max<<"\n";
         std::cout<<"frame_id= "<<cloud_msg->header.frame_id<<"\n";
 
