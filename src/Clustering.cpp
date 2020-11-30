@@ -85,9 +85,9 @@ visualization_msgs::Marker Clustering::GetPersonBoundingBoxes(const sensor_msgs:
     pcl::PCLPointCloud2 outputPCL;
     int count = 0;
     float max;//to get cluster with maximum size
-    visualization_msgs::MarkerArray marker_array_;
+    //visualization_msgs::MarkerArray marker_array_;
     visualization_msgs::Marker max_object_marker;//to get object marker of maximum size cluster
-    sensor_msgs::PointCloud2 max_cloud_msg; 
+    //sensor_msgs::PointCloud2 max_cloud_msg; 
     
     std::cout<<cluster_indices.size()<<"fasdf\n";
     // here, cluster_indices is a vector of indices for each cluster. iterate through each indices object to work with them seporately
@@ -116,6 +116,7 @@ visualization_msgs::Marker Clustering::GetPersonBoundingBoxes(const sensor_msgs:
         //pcl::toPCLPointCloud2( *clusterPtr ,outputPCL);
         // Convert to ROS data type
         //pcl_conversions::fromPCL(outputPCL, output);
+        //marker_array_.markers.push_back(object_marker);
         if(it==cluster_indices.begin())
         {
             max = abs(object_marker.scale.x+object_marker.scale.y+object_marker.scale.z);
@@ -128,12 +129,11 @@ visualization_msgs::Marker Clustering::GetPersonBoundingBoxes(const sensor_msgs:
             max = abs(object_marker.scale.x+object_marker.scale.y+object_marker.scale.z); 
             //max_cloud_msg = output;
         }
-        marker_array_.markers.push_back(object_marker);
-        std::cout<<"size= "<<max<<"\n";
-        std::cout<<"frame_id= "<<cloud_msg->header.frame_id<<"\n";
+        
 
     }
-    PublishBoxesArray(marker_array_);
+    //
+    //PublishBoxesArray(marker_array_);
     return max_object_marker;
 
 }
