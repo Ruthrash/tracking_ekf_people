@@ -40,7 +40,7 @@ void Clustering::GetAxisAlignedBoundingBox(pcl::PointCloud<pcl::PointXYZ>::Const
 }
 
 
-visualization_msgs::Marker Clustering::GetPersonBoundingBoxes(const sensor_msgs::PointCloud2ConstPtr& cloud_msg)
+visualization_msgs::Marker Clustering::GetPersonBoundingBoxes(const sensor_msgs::PointCloud2ConstPtr& cloud_msg, const int &id)
 {
     std::cout<<"Trying clustering\n";
     // Container for original & filtered data
@@ -53,6 +53,10 @@ visualization_msgs::Marker Clustering::GetPersonBoundingBoxes(const sensor_msgs:
     // Perform voxel grid downsampling filtering
     pcl::VoxelGrid<pcl::PCLPointCloud2> sor;
     sor.setInputCloud (cloudPtr); sor.setLeafSize (0.01, 0.01, 0.01); sor.filter (*cloudFilteredPtr);//cloudFilteredPtr has voxelised pointcloud
+
+    //remove ground plane 
+
+
 
     pcl::PointCloud<pcl::PointXYZ> *xyz_cloud = new pcl::PointCloud<pcl::PointXYZ>;
     pcl::PointCloud<pcl::PointXYZ>::Ptr xyzCloudPtr (xyz_cloud); // need a boost shared pointer for pcl function inputs
@@ -68,14 +72,13 @@ visualization_msgs::Marker Clustering::GetPersonBoundingBoxes(const sensor_msgs:
     // create the extraction object for the clusters
     std::vector<pcl::PointIndices> cluster_indices; pcl::EuclideanClusterExtraction<pcl::PointXYZ> ec;
     // specify euclidean cluster parameters
-    float cluster_tolerance = 0.03 , min_cluster_size = 500, max_cluster_size = 6500;
+    float cluster_tolerance, min_cluster_size, max_cluster_size;
     nh.getParam("cluster_tolerance",cluster_tolerance);
     nh.getParam("min_cluster_size",min_cluster_size);
     nh.getParam("max_cluster_size",max_cluster_size);
     
     // exctract the indices pertaining to each cluster and store in a vector of pcl::PointIndices
     ec.setClusterTolerance (cluster_tolerance); ec.setMinClusterSize (min_cluster_size); ec.setMaxClusterSize (max_cluster_size);
-    std::cout<<min_cluster_size<<", "<<max_cluster_size<<", "<<cluster_tolerance<<std::endl;
     ec.setSearchMethod (tree);
     ec.setInputCloud (xyzCloudPtr);
     ec.extract (cluster_indices);
@@ -85,7 +88,7 @@ visualization_msgs::Marker Clustering::GetPersonBoundingBoxes(const sensor_msgs:
     pcl::PCLPointCloud2 outputPCL;
     int count = 0;
     float max;//to get cluster with maximum size
-    //visualization_msgs::MarkerArray marker_array_;
+    visualization_msgs::MarkerArray marker_array_;
     visualization_msgs::Marker max_object_marker;//to get object marker of maximum size cluster
     //sensor_msgs::PointCloud2 max_cloud_msg; 
     
@@ -106,7 +109,7 @@ visualization_msgs::Marker Clustering::GetPersonBoundingBoxes(const sensor_msgs:
         }
         visualization_msgs::Marker object_marker;
         object_marker.ns = "objects";
-        object_marker.id = ++count;
+        object_marker.id = id;
         object_marker.header.frame_id = cloud_msg->header.frame_id;
         object_marker.type = visualization_msgs::Marker::CUBE;   
         object_marker.color.g = 1;
@@ -123,13 +126,13 @@ visualization_msgs::Marker Clustering::GetPersonBoundingBoxes(const sensor_msgs:
             max_object_marker = object_marker;
             //max_cloud_msg = output;
         }
-        else if(size > max )//&& abs(object_marker.pose.position.y) <= 0.5)
+        else if(size > max)
         {
             max_object_marker = object_marker;
             max = abs(object_marker.scale.x+object_marker.scale.y+object_marker.scale.z); 
             //max_cloud_msg = output;
         }
-        
+        //marker_array_.markers.push_back(object_marker);
 
     }
     //

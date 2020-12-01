@@ -56,14 +56,18 @@ void PersonDetection::SyncYOLODepthCB(const darknet_ros_msgs::BoundingBoxes::Con
                 ROS_INFO("Depth image has unsupported encoding [%s]", depth_msg->encoding.c_str());
                 return;
             }
-            visualization_msgs::Marker marker_ = Clustering::GetPersonBoundingBoxes(cloud_msg);
+            visualization_msgs::Marker marker_ = Clustering::GetPersonBoundingBoxes(cloud_msg, i);
+            //for(int j = 0; j < marker_array_d.markers.size() ; j++)
+             //   marker_array.markers.push_back(marker_array_d.markers[j]);
             //Clustering::PersonCloud(*cloud_msg);
+            //ros::Duration(0.5).sleep();
             marker_array.markers.push_back(marker_);
            // marker_array.header = marker_.header;
         }
     }
-    std::cout<<count<<"vountttt\n";
     Clustering::PublishBoxesArray(marker_array);
+    std::cout<<marker_array.markers.size()<<"vountttt\n";
+  
 }
 
 
