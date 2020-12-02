@@ -8,15 +8,15 @@
     <include file="$(find darknet_ros)/launch/darknet_ros.launch"/>
 -->
     <!-- Register Depth and RGB image -->
-    <include file="$(find extrinsic_calibration)/launch/register_depth_sim.launch">
+    <include file="$(find extrinsic_calibration)/launch/register_depth_ktp.launch">
     </include>
  
   
   <!-- segments depth image using 2d bounding box
   <node pkg="det_and_tracking" type="boundingboxpoints" name="yolo_depth_segmentation"/>-->
-  <param name="cluster_tolerance" value="0.04"/>
-<param name="min_cluster_size" value="200"/>
-<param name="max_cluster_size" value="4000"/>
+  <param name="cluster_tolerance" value="0.03"/>
+<param name="min_cluster_size" value="100"/>
+<param name="max_cluster_size" value="5000"/>
 <!-- Publishes 3D Detection as markers -->
 <!--Modify this to use rectified information from gazebo directly and bounding box information from YOLO -->  
  <node pkg="tracking_ekf_people" type="main" name="main"  output="screen" > 

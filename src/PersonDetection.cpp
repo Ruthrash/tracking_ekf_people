@@ -7,10 +7,11 @@ PersonDetection::PersonDetection(ros::NodeHandle &node) : Clustering(node)
 {
     yolo_sync_sub.subscribe(node, "/darknet_ros/bounding_boxes",300);
     depth_sync_sub.subscribe(node, "/pepper_robot/camera/depth_registered/image_rect",300);
-    std::cout<<"running corrections \n";
+    //depth_sync_sub.subscribe(node, "/camera/depth_registered/image",300);
     sync_.reset(new Sync(MySyncPolicy(3000), yolo_sync_sub, depth_sync_sub));
     sync_->registerCallback(boost::bind(&PersonDetection::SyncYOLODepthCB, this, _1, _2));
     depth_info_sub = node.subscribe("/pepper_robot/camera/depth_registered/camera_info", 1, &PersonDetection::DepthInfoCB, this);
+    //depth_info_sub = node.subscribe("/camera/depth_registered/camera_info", 1, &PersonDetection::DepthInfoCB, this);
 }
 
 void PersonDetection::DepthInfoCB(const sensor_msgs::CameraInfo &depth_info_msg)
@@ -31,7 +32,6 @@ void PersonDetection::SyncYOLODepthCB(const darknet_ros_msgs::BoundingBoxes::Con
             count++;        
             //get each person detection as a XYZ pointcloud
             sensor_msgs::PointCloud2::Ptr cloud_msg(new sensor_msgs::PointCloud2);
-            std::cout<<"frame id depth "<<depth_msg->header.frame_id<<"\n";
             cloud_msg->header = depth_msg->header;
             //cloud_msg->height = bb->bounding_boxes[i].ymax - bb->bounding_boxes[i].ymin;
             cloud_msg->height = depth_msg->height;
@@ -59,7 +59,7 @@ void PersonDetection::SyncYOLODepthCB(const darknet_ros_msgs::BoundingBoxes::Con
             visualization_msgs::Marker marker_ = Clustering::GetPersonBoundingBoxes(cloud_msg, i);
             //for(int j = 0; j < marker_array_d.markers.size() ; j++)
              //   marker_array.markers.push_back(marker_array_d.markers[j]);
-            //Clustering::PersonCloud(*cloud_msg);
+            Clustering::PersonCloud(*cloud_msg);
             //ros::Duration(0.5).sleep();
             marker_array.markers.push_back(marker_);
            // marker_array.header = marker_.header;

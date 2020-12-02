@@ -42,7 +42,7 @@ void Clustering::GetAxisAlignedBoundingBox(pcl::PointCloud<pcl::PointXYZ>::Const
 
 visualization_msgs::Marker Clustering::GetPersonBoundingBoxes(const sensor_msgs::PointCloud2ConstPtr& cloud_msg, const int &id)
 {
-    std::cout<<"Trying clustering\n";
+    //std::cout<<"Trying clustering\n";
     // Container for original & filtered data
     pcl::PCLPointCloud2* cloud = new pcl::PCLPointCloud2; pcl::PCLPointCloud2ConstPtr cloudPtr(cloud);
     pcl::PCLPointCloud2* cloud_filtered = new pcl::PCLPointCloud2;  pcl::PCLPointCloud2Ptr cloudFilteredPtr (cloud_filtered);
@@ -135,6 +135,7 @@ visualization_msgs::Marker Clustering::GetPersonBoundingBoxes(const sensor_msgs:
         //marker_array_.markers.push_back(object_marker);
 
     }
+    std::cout<<"Max obj "<<max_object_marker.header.frame_id; 
     //
     //PublishBoxesArray(marker_array_);
     return max_object_marker;
