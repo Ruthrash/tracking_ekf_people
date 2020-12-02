@@ -44,14 +44,14 @@ private:
     ros::Subscriber depth_info_sub; 
     void DepthInfoCB(const sensor_msgs::CameraInfo &depth_camera_info);
     image_geometry::PinholeCameraModel depth_model_;
-    template<typename T>//creates a pointcloud of the person within YOLO's bounding box and outputs after filtering out outliers using Euclidean clustering
-    void CreatePointCloud(const sensor_msgs::ImageConstPtr& depth_msg, sensor_msgs::PointCloud2::Ptr& cloud_msg, const image_geometry::PinholeCameraModel& depth_model_, const darknet_ros_msgs::BoundingBox& bb, double range_max);
+    //template<typename T>//creates a pointcloud of the person within YOLO's bounding box and outputs after filtering out outliers using Euclidean clustering
+    //void CreatePointCloud(const sensor_msgs::ImageConstPtr& depth_msg, sensor_msgs::PointCloud2::Ptr& cloud_msg, const image_geometry::PinholeCameraModel& depth_model_, const darknet_ros_msgs::BoundingBox& bb, double range_max);
 
 
     
 };
 
-// Encapsulate differences between processing float and uint16_t depths
+/* Encapsulate differences between processing float and uint16_t depths
 template<typename T> struct DepthTraits {};
 
 template<>
@@ -76,6 +76,6 @@ struct DepthTraits<float>
     float* end = reinterpret_cast<float*>(&buffer[0] + buffer.size());
     std::fill(start, end, std::numeric_limits<float>::quiet_NaN());
   }
-};
+};*/
 
 #endif
