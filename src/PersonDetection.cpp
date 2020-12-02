@@ -3,21 +3,20 @@
 PersonDetection::PersonDetection(){}
 PersonDetection::~PersonDetection(){}
 
-PersonDetection::PersonDetection(ros::NodeHandle &node) : Clustering(node)
+PersonDetection::PersonDetection(ros::NodeHandle &node) : Clustering(node), DepthImageProc(node)
 {
     yolo_sync_sub.subscribe(node, "/darknet_ros/bounding_boxes",300);
-    depth_sync_sub.subscribe(node, "/pepper_robot/camera/depth_registered/image_rect",300);
+    depth_sync_sub.subscribe(node, "/pepper_robot/camera/depth/image_raw",300);
     //depth_sync_sub.subscribe(node, "/camera/depth_registered/image",300);
     sync_.reset(new Sync(MySyncPolicy(3000), yolo_sync_sub, depth_sync_sub));
     sync_->registerCallback(boost::bind(&PersonDetection::SyncYOLODepthCB, this, _1, _2));
-    depth_info_sub = node.subscribe("/pepper_robot/camera/depth_registered/camera_info", 1, &PersonDetection::DepthInfoCB, this);
     //depth_info_sub = node.subscribe("/camera/depth_registered/camera_info", 1, &PersonDetection::DepthInfoCB, this);
+    tf_buffer_.reset( new tf2_ros::Buffer );
+    tf_.reset( new tf2_ros::TransformListener(*tf_buffer_) );
+    depth_reg_pub = node.advertise<sensor_msgs::Image>("image_rect", 1000);
 }
 
-void PersonDetection::DepthInfoCB(const sensor_msgs::CameraInfo &depth_info_msg)
-{
-    depth_model_.fromCameraInfo(depth_info_msg);
-}
+
 
 
 void PersonDetection::SyncYOLODepthCB(const darknet_ros_msgs::BoundingBoxes::ConstPtr& bb, const sensor_msgs::Image::ConstPtr& depth_msg)
@@ -27,29 +26,67 @@ void PersonDetection::SyncYOLODepthCB(const darknet_ros_msgs::BoundingBoxes::Con
     int count = 0;
     for (int i = 0; i < bb->bounding_boxes.size(); ++i)
     {
-        if(bb->bounding_boxes[i].Class == "person")
-        {
+        if(bb->bounding_boxes[i].Class == "person" && rgb_info.header.frame_id != ""&& depth_info.header.frame_id != "")
+        { 
+            
             count++;        
+            Eigen::Affine3d depth_to_rgb;
+            try
+            {
+                //std::cout<<"rgb_info frame id "<<rgb_info_msg->header.frame_id<<" depth_info frame id"<<depth_info_msg->header.frame_id<<std::endl; 
+                std::string rgb_info_id = rgb_info.header.frame_id;
+                //rgb_info_msg->header.frame_id = rgb_info.erase(0,1);
+                std::string depth_info_id =     depth_info.header.frame_id;
+                //depth_info_msg->header.frame_id = depth_info.erase(0,1);
+                //depth_info = depth_info.erase(0,1);
+                //rgb_info = rgb_info.erase(0,1);
+                //rgb_info_msg->header.frame_id = rgb_info;
+                //depth_info_msg->header.frame_id = depth_info;
+                geometry_msgs::TransformStamped transform = tf_buffer_->lookupTransform (
+                                    rgb_info_id, depth_info_id,
+                                    depth_msg->header.stamp);
+
+                tf::transformMsgToEigen(transform.transform, depth_to_rgb);
+            }
+            catch (tf2::TransformException& ex)
+            {
+                ROS_INFO( "TF2 exception:\n%s", ex.what());
+                return;
+                /// @todo Can take on order of a minute to register a disconnect callback when we
+                /// don't call publish() in this cb. What's going on roscpp?
+            }
+            // Allocate registered depth image
+            sensor_msgs::ImagePtr registered_msg( new sensor_msgs::Image );
+            registered_msg->header.stamp    = depth_msg->header.stamp;
+            //std::string rgb_info_id = rgb_info->header.frame_id;
+            //std::cout<<"ulalalaaa "<<rgb_info<<std::endl;
+            //rgb_info = rgb_info.erase(0,1);
+            registered_msg->header.frame_id = rgb_info.header.frame_id;
+            registered_msg->encoding        = depth_msg->encoding;
+            
+            cv::Size resolution = rgb_model_.reducedResolution();
+            registered_msg->height = resolution.height;
+            registered_msg->width  = resolution.width;
+            // step and data set in convert(), depend on depth data type
+
             //get each person detection as a XYZ pointcloud
             sensor_msgs::PointCloud2::Ptr cloud_msg(new sensor_msgs::PointCloud2);
-            cloud_msg->header = depth_msg->header;
-            //cloud_msg->height = bb->bounding_boxes[i].ymax - bb->bounding_boxes[i].ymin;
-            cloud_msg->height = depth_msg->height;
-            //cloud_msg->width  = bb->bounding_boxes[i].xmax - bb->bounding_boxes[i].xmin;
-            cloud_msg->width  = depth_msg->width;
-            cloud_msg->is_dense = false;
-            cloud_msg->is_bigendian = false;
-            sensor_msgs::PointCloud2Modifier pcd_modifier(*cloud_msg);
-            pcd_modifier.setPointCloud2FieldsByString(1, "xyz");
-            darknet_ros_msgs::BoundingBoxes boxes = *bb;
+            cloud_msg->header = registered_msg->header; cloud_msg->height = registered_msg->height; cloud_msg->width  = registered_msg->width;
+            cloud_msg->is_dense = false; cloud_msg->is_bigendian = false;
+            sensor_msgs::PointCloud2Modifier pcd_modifier(*cloud_msg); pcd_modifier.setPointCloud2FieldsByString(1, "xyz");
 
             if (depth_msg->encoding == sensor_msgs::image_encodings::TYPE_16UC1)
             {
-                CreatePointCloud<uint16_t>(depth_msg, cloud_msg, depth_model_, boxes.bounding_boxes[i], 0.0);
+                RegisterDepthToRGB<uint16_t>(depth_msg, registered_msg, depth_to_rgb);
+                depth_reg_pub.publish(registered_msg);
+                CreatePointCloud<uint16_t>(registered_msg, cloud_msg, depth_model_, bb->bounding_boxes[i], 0.0);
+                
             }
             else if (depth_msg->encoding == sensor_msgs::image_encodings::TYPE_32FC1)
             {
-                CreatePointCloud<float>(depth_msg, cloud_msg, depth_model_, boxes.bounding_boxes[i], 0.0);
+                RegisterDepthToRGB<float>(depth_msg, registered_msg, depth_to_rgb);
+                depth_reg_pub.publish(registered_msg);
+                CreatePointCloud<float>(registered_msg, cloud_msg, depth_model_, bb->bounding_boxes[i], 0.0);
             }
             else
             {
@@ -59,7 +96,7 @@ void PersonDetection::SyncYOLODepthCB(const darknet_ros_msgs::BoundingBoxes::Con
             visualization_msgs::Marker marker_ = Clustering::GetPersonBoundingBoxes(cloud_msg, i);
             //for(int j = 0; j < marker_array_d.markers.size() ; j++)
              //   marker_array.markers.push_back(marker_array_d.markers[j]);
-            //Clustering::PersonCloud(*cloud_msg);
+            Clustering::PersonCloud(*cloud_msg);
             //ros::Duration(0.5).sleep();
             marker_array.markers.push_back(marker_);
            // marker_array.header = marker_.header;
@@ -75,76 +112,5 @@ void PersonDetection::SyncYOLODepthCB(const darknet_ros_msgs::BoundingBoxes::Con
   
 }
 
-
-
-
-/*
-template<typename T>
-void RegisterNodelet::convert(const sensor_msgs::ImageConstPtr& depth_msg,
-                              const sensor_msgs::ImagePtr& registered_msg,
-                              const Eigen::Affine3d& depth_to_rgb)
-{
-  // Allocate memory for registered depth image
-  registered_msg->step = registered_msg->width * sizeof(T);
-  registered_msg->data.resize( registered_msg->height * registered_msg->step );
-  // data is already zero-filled in the uint16 case, but for floats we want to initialize everything to NaN.
-  DepthTraits<T>::initializeBuffer(registered_msg->data);
-
-  // Extract all the parameters we need
-  double inv_depth_fx = 1.0 / depth_model_.fx();
-  double inv_depth_fy = 1.0 / depth_model_.fy();
-  double depth_cx = depth_model_.cx(), depth_cy = depth_model_.cy();
-  double depth_Tx = depth_model_.Tx(), depth_Ty = depth_model_.Ty();
-  double rgb_fx = rgb_model_.fx(), rgb_fy = rgb_model_.fy();
-  double rgb_cx = rgb_model_.cx(), rgb_cy = rgb_model_.cy();
-  //double rgb_fx = 2740139509 , rgb_fy = 275.74184670;
-  //double rgb_cx = 141.1319308, rgb_cy = 106.39174605;
-  double rgb_Tx = rgb_model_.Tx(), rgb_Ty = rgb_model_.Ty();
-  //std::cout<<rgb_fx<<", "rgb_fy<<", "<<rgb_Tx<<", "<<rgb_Ty<<", "rgb_cx<<", "<<rgb_cy<<std::endl;
-  
-  // Transform the depth values into the RGB frame
-  /// @todo When RGB is higher res, interpolate by rasterizing depth triangles onto the registered image  
-  const T* depth_row = reinterpret_cast<const T*>(&depth_msg->data[0]);
-  int row_step = depth_msg->step / sizeof(T);
-  T* registered_data = reinterpret_cast<T*>(&registered_msg->data[0]);
-  int raw_index = 0;
-  for (unsigned v = 0; v < depth_msg->height; ++v, depth_row += row_step)
-  {
-    for (unsigned u = 0; u < depth_msg->width; ++u, ++raw_index)
-    {
-      T raw_depth = depth_row[u];
-      if (!DepthTraits<T>::valid(raw_depth))
-        continue;
-      
-      double depth = DepthTraits<T>::toMeters(raw_depth);
-
-      /// @todo Combine all operations into one matrix multiply on (u,v,d)
-      // Reproject (u,v,Z) to (X,Y,Z,1) in depth camera frame
-      Eigen::Vector4d xyz_depth;
-      xyz_depth << ((u - depth_cx)*depth - depth_Tx) * inv_depth_fx,
-                   ((v - depth_cy)*depth - depth_Ty) * inv_depth_fy,
-                   depth,
-                   1;
-
-      // Transform to RGB camera frame
-      Eigen::Vector4d xyz_rgb = depth_to_rgb * xyz_depth;
-
-      // Project to (u,v) in RGB image
-      double inv_Z = 1.0 / xyz_rgb.z();
-      int u_rgb = (rgb_fx*xyz_rgb.x() + rgb_Tx)*inv_Z + rgb_cx + 0.5;
-      int v_rgb = (rgb_fy*xyz_rgb.y() + rgb_Ty)*inv_Z + rgb_cy + 0.5;
-      
-      if (u_rgb < 0 || u_rgb >= (int)registered_msg->width ||
-          v_rgb < 0 || v_rgb >= (int)registered_msg->height)
-        continue;
-      
-      T& reg_depth = registered_data[v_rgb*registered_msg->width + u_rgb];
-      T  new_depth = DepthTraits<T>::fromMeters(xyz_rgb.z());
-      // Validity and Z-buffer checks
-      if (!DepthTraits<T>::valid(reg_depth) || reg_depth > new_depth)
-        reg_depth = new_depth;
-    }
-  }
-}*/
 
 

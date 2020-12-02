@@ -19,6 +19,7 @@ find_package(catkin REQUIRED COMPONENTS
   image_geometry
   pcl_ros
   pcl_conversions
+  eigen_conversions
 )
 
 find_package(Eigen 3 QUIET)

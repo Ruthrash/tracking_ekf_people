@@ -7,9 +7,9 @@
     <!-- Person Detection 
     <include file="$(find darknet_ros)/launch/darknet_ros.launch"/>
 -->
-    <!-- Register Depth and RGB image -->
+    <!-- Register Depth and RGB image 
     <include file="$(find extrinsic_calibration)/launch/register_depth_sim.launch">
-    </include>
+    </include>-->
  
   
   <!-- segments depth image using 2d bounding box
