@@ -6,11 +6,13 @@ PersonDetection::~PersonDetection(){}
 PersonDetection::PersonDetection(ros::NodeHandle &node) : Clustering(node)
 {
     yolo_sync_sub.subscribe(node, "/darknet_ros/bounding_boxes",300);
-    depth_sync_sub.subscribe(node, "/pepper_robot/camera/depth_registered/image_rect",300);
+    //depth_sync_sub.subscribe(node, "/pepper_robot/camera/depth_registered/image_rect",300);
+    depth_sync_sub.subscribe(node, "/camera/depth_registered/image",300);
     std::cout<<"running corrections \n";
     sync_.reset(new Sync(MySyncPolicy(3000), yolo_sync_sub, depth_sync_sub));
     sync_->registerCallback(boost::bind(&PersonDetection::SyncYOLODepthCB, this, _1, _2));
-    depth_info_sub = node.subscribe("/pepper_robot/camera/depth_registered/camera_info", 1, &PersonDetection::DepthInfoCB, this);
+    //depth_info_sub = node.subscribe("/pepper_robot/camera/depth_registered/camera_info", 1, &PersonDetection::DepthInfoCB, this);
+    depth_info_sub = node.subscribe("/camera/depth_registered/camera_info", 1, &PersonDetection::DepthInfoCB, this);
 }
 
 void PersonDetection::DepthInfoCB(const sensor_msgs::CameraInfo &depth_info_msg)
@@ -31,7 +33,6 @@ void PersonDetection::SyncYOLODepthCB(const darknet_ros_msgs::BoundingBoxes::Con
             count++;        
             //get each person detection as a XYZ pointcloud
             sensor_msgs::PointCloud2::Ptr cloud_msg(new sensor_msgs::PointCloud2);
-            std::cout<<"frame id depth "<<depth_msg->header.frame_id<<"\n";
             cloud_msg->header = depth_msg->header;
             //cloud_msg->height = bb->bounding_boxes[i].ymax - bb->bounding_boxes[i].ymin;
             cloud_msg->height = depth_msg->height;
@@ -58,9 +59,12 @@ void PersonDetection::SyncYOLODepthCB(const darknet_ros_msgs::BoundingBoxes::Con
             }
             visualization_msgs::Marker marker_ = Clustering::GetPersonBoundingBoxes(cloud_msg, i);
             //for(int j = 0; j < marker_array_d.markers.size() ; j++)
-             //   marker_array.markers.push_back(marker_array_d.markers[j]);
-            //Clustering::PersonCloud(*cloud_msg);
-            //ros::Duration(0.5).sleep();
+            //   marker_array.markers.push_back(marker_array_d.markers[j]);
+            Clustering::PersonCloud(*cloud_msg);
+            ros::Duration(0.5).sleep();
+            std::cout<<"id:"<<marker_.id<<", frme id "<< marker_.header.frame_id<<"\n";
+            marker_.id = count; 
+            marker_.header.frame_id = depth_msg->header.frame_id;
             marker_array.markers.push_back(marker_);
            // marker_array.header = marker_.header;
         }
@@ -86,13 +90,33 @@ void PersonDetection::CreatePointCloud(const sensor_msgs::ImageConstPtr& depth_m
     float constant_y = unit_scaling / depth_model_.fy();
     float bad_point = std::numeric_limits<float>::quiet_NaN();
 
-    sensor_msgs::PointCloud2Iterator<float> iter_x(*cloud_msg, "x");
-    sensor_msgs::PointCloud2Iterator<float> iter_y(*cloud_msg, "y");
-    sensor_msgs::PointCloud2Iterator<float> iter_z(*cloud_msg, "z");
     const T* depth_row = reinterpret_cast<const T*>(&depth_msg->data[0]);
     int row_step = depth_msg->step / sizeof(T);
     std::cout<<"boxes:"<<bb.xmin<<", "<<bb.xmax<<", "<<bb.ymin<<", "<<bb.ymax<<"\n";
     std::cout<<"iter: "<<(int)cloud_msg->height<<", "<<(int)cloud_msg->width<<"\n";
+    float avg_depth = 0.0;
+    int count = 1.0; 
+    for (int v = (int)bb.ymin; v <= (int)bb.ymax; ++v, depth_row += row_step)
+    {
+        for (int u = (int)bb.xmin; u <= (int)bb.xmax; ++u)
+        {
+            T depth = depth_row[u];
+            if (DepthTraits<T>::valid(depth))
+            {
+            // Missing points denoted by NaNs
+            ++count;
+            avg_depth = avg_depth +  DepthTraits<T>::toMeters(depth);
+            }
+
+        }
+    }
+    std::cout<<"avg depth: "<<avg_depth/count<<"\n";
+    sensor_msgs::PointCloud2Iterator<float> iter_x(*cloud_msg, "x");
+    sensor_msgs::PointCloud2Iterator<float> iter_y(*cloud_msg, "y");
+    sensor_msgs::PointCloud2Iterator<float> iter_z(*cloud_msg, "z");
+    depth_row = reinterpret_cast<const T*>(&depth_msg->data[0]);
+    row_step = depth_msg->step / sizeof(T);
+
     for (int v = 0; v < (int)cloud_msg->height; ++v, depth_row += row_step)
     //for (int v = (int)bb.ymin; v <= (int)bb.ymax; ++v, depth_row += row_step)
     {
@@ -115,11 +139,23 @@ void PersonDetection::CreatePointCloud(const sensor_msgs::ImageConstPtr& depth_m
             }
         }
         // Fill in XYZ
-        if(u>=bb.xmin && u<=bb.xmax && v>=bb.ymin && v<=bb.ymax)
+        if(avg_depth != 0.0 )
         {
-            *iter_x = (u - center_x) * depth * constant_x;
-            *iter_y = (v - center_y) * depth * constant_y;
-            *iter_z = DepthTraits<T>::toMeters(depth);
+            if((u>=bb.xmin && u<=bb.xmax && v>=bb.ymin && v<=bb.ymax) && DepthTraits<T>::toMeters(depth) < 0.7*avg_depth/count)
+            {
+                *iter_x = (u - center_x) * depth * constant_x;
+                *iter_y = (v - center_y) * depth * constant_y;
+                *iter_z = DepthTraits<T>::toMeters(depth);
+            }
+        }
+        else 
+        {
+            if(u>=bb.xmin && u<=bb.xmax && v>=bb.ymin && v<=bb.ymax)
+            {
+                *iter_x = (u - center_x) * depth * constant_x;
+                *iter_y = (v - center_y) * depth * constant_y;
+                *iter_z = DepthTraits<T>::toMeters(depth);
+            }
         }
         }
     }

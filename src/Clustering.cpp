@@ -42,7 +42,6 @@ void Clustering::GetAxisAlignedBoundingBox(pcl::PointCloud<pcl::PointXYZ>::Const
 
 visualization_msgs::Marker Clustering::GetPersonBoundingBoxes(const sensor_msgs::PointCloud2ConstPtr& cloud_msg, const int &id)
 {
-    std::cout<<"Trying clustering\n";
     // Container for original & filtered data
     pcl::PCLPointCloud2* cloud = new pcl::PCLPointCloud2; pcl::PCLPointCloud2ConstPtr cloudPtr(cloud);
     pcl::PCLPointCloud2* cloud_filtered = new pcl::PCLPointCloud2;  pcl::PCLPointCloud2Ptr cloudFilteredPtr (cloud_filtered);
@@ -92,7 +91,6 @@ visualization_msgs::Marker Clustering::GetPersonBoundingBoxes(const sensor_msgs:
     visualization_msgs::Marker max_object_marker;//to get object marker of maximum size cluster
     //sensor_msgs::PointCloud2 max_cloud_msg; 
     
-    std::cout<<cluster_indices.size()<<"fasdf\n";
     // here, cluster_indices is a vector of indices for each cluster. iterate through each indices object to work with them seporately
     for (std::vector<pcl::PointIndices>::const_iterator it = cluster_indices.begin (); it != cluster_indices.end (); ++it)
     {
