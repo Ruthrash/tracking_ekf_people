@@ -117,9 +117,12 @@ void PersonDetection::CreatePointCloud(const sensor_msgs::ImageConstPtr& depth_m
         // Fill in XYZ
         if(u>=bb.xmin && u<=bb.xmax && v>=bb.ymin && v<=bb.ymax)
         {
-            *iter_x = (u - center_x) * depth * constant_x;
-            *iter_y = (v - center_y) * depth * constant_y;
-            *iter_z = DepthTraits<T>::toMeters(depth);
+            if((v - center_y) * depth * constant_y < 3.0)
+            {
+                *iter_x = (u - center_x) * depth * constant_x;
+                *iter_y = (v - center_y) * depth * constant_y;
+                *iter_z = DepthTraits<T>::toMeters(depth);
+            }
         }
         }
     }

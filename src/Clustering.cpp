@@ -54,16 +54,88 @@ visualization_msgs::Marker Clustering::GetPersonBoundingBoxes(const sensor_msgs:
     pcl::VoxelGrid<pcl::PCLPointCloud2> sor;
     sor.setInputCloud (cloudPtr); sor.setLeafSize (0.01, 0.01, 0.01); sor.filter (*cloudFilteredPtr);//cloudFilteredPtr has voxelised pointcloud
 
+
+
+  pcl::PointCloud<pcl::PointXYZ> *xyz_cloud = new pcl::PointCloud<pcl::PointXYZ>;
+  pcl::PointCloud<pcl::PointXYZ>::Ptr xyzCloudPtr_ (xyz_cloud); // need a boost shared pointer for pcl function inputs
+
+  // convert the pcl::PointCloud2 tpye to pcl::PointCloud<pcl::PointXYZRGB>
+  pcl::fromPCLPointCloud2(*cloudFilteredPtr, *xyzCloudPtr_);
+
+
+  //perform passthrough filtering to remove table leg
+
+  // create a pcl object to hold the passthrough filtered results
+  pcl::PointCloud<pcl::PointXYZ> *xyz_cloud_filtered = new pcl::PointCloud<pcl::PointXYZ>;
+  pcl::PointCloud<pcl::PointXYZ>::Ptr xyzCloudPtrFiltered (xyz_cloud_filtered);
+
+  // Create the filtering object
+  pcl::PassThrough<pcl::PointXYZ> pass;
+  pass.setInputCloud (xyzCloudPtr_);
+  pass.setFilterFieldName ("y");
+  pass.setFilterLimits (-2.0, 1.1);
+  //pass.setFilterLimitsNegative (true);
+  pass.filter (*xyzCloudPtrFiltered);
+
+
+
+  // create a pcl object to hold the ransac filtered results
+  pcl::PointCloud<pcl::PointXYZ> *xyz_cloud_ransac_filtered = new pcl::PointCloud<pcl::PointXYZ>;
+  pcl::PointCloud<pcl::PointXYZ>::Ptr xyzCloudPtrRansacFiltered (xyz_cloud_ransac_filtered);
+
+
+  // perform ransac planar filtration to remove table top
+  pcl::ModelCoefficients::Ptr coefficients (new pcl::ModelCoefficients);
+  pcl::PointIndices::Ptr inliers (new pcl::PointIndices);
+  // Create the segmentation object
+  pcl::SACSegmentation<pcl::PointXYZ> seg1;
+  // Optional
+  seg1.setOptimizeCoefficients (true);
+  // Mandatory
+  seg1.setModelType (pcl::SACMODEL_PLANE);
+  seg1.setMethodType (pcl::SAC_RANSAC);
+  seg1.setDistanceThreshold (0.04);
+
+  seg1.setInputCloud (xyzCloudPtrFiltered);
+  seg1.segment (*inliers, *coefficients);
+
+
+  // Create the filtering object
+  pcl::ExtractIndices<pcl::PointXYZ> extract;
+
+  //extract.setInputCloud (xyzCloudPtrFiltered);
+  extract.setInputCloud (xyzCloudPtrFiltered);
+  extract.setIndices (inliers);
+  extract.setNegative (true);
+  extract.filter (*xyzCloudPtrRansacFiltered);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     //remove ground plane 
 
 
 
-    pcl::PointCloud<pcl::PointXYZ> *xyz_cloud = new pcl::PointCloud<pcl::PointXYZ>;
-    pcl::PointCloud<pcl::PointXYZ>::Ptr xyzCloudPtr (xyz_cloud); // need a boost shared pointer for pcl function inputs
+    pcl::PointCloud<pcl::PointXYZ> *xyz_cloud_ = new pcl::PointCloud<pcl::PointXYZ>;
+    pcl::PointCloud<pcl::PointXYZ>::Ptr xyzCloudPtr (xyz_cloud_); // need a boost shared pointer for pcl function inputs
 
     // convert the pcl::PointCloud2 tpye to pcl::PointCloud<pcl::PointXYZRGB>
-    pcl::fromPCLPointCloud2(*cloudFilteredPtr, *xyzCloudPtr);
-
+    //pcl::fromPCLPointCloud2(*cloudFilteredPtr, *xyzCloudPtr);
+    //pcl::fromPCLPointCloud2(*xyzCloudPtrRansacFiltered, *xyzCloudPtr);
+    xyzCloudPtr = xyzCloudPtrRansacFiltered;
     // perform euclidean cluster segmentation to seporate individual objects
     // Create the KdTree object for the search method of the extraction
     pcl::search::KdTree<pcl::PointXYZ>::Ptr tree (new pcl::search::KdTree<pcl::PointXYZ>);
@@ -136,6 +208,9 @@ visualization_msgs::Marker Clustering::GetPersonBoundingBoxes(const sensor_msgs:
 
     }
     std::cout<<"Max obj "<<max_object_marker.header.frame_id; 
+    max_object_marker.header.stamp = ros::Time::now();
+    ros::Duration d(1);
+    max_object_marker.lifetime =d; 
     //
     //PublishBoxesArray(marker_array_);
     return max_object_marker;
