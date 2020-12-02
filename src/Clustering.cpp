@@ -52,7 +52,7 @@ visualization_msgs::Marker Clustering::GetPersonBoundingBoxes(const sensor_msgs:
 
     // Perform voxel grid downsampling filtering
     pcl::VoxelGrid<pcl::PCLPointCloud2> sor;
-    sor.setInputCloud (cloudPtr); sor.setLeafSize (0.01, 0.01, 0.01); sor.filter (*cloudFilteredPtr);//cloudFilteredPtr has voxelised pointcloud
+    sor.setInputCloud (cloudPtr); sor.setLeafSize (0.03, 0.03, 0.03); sor.filter (*cloudFilteredPtr);//cloudFilteredPtr has voxelised pointcloud
 
 
 
@@ -73,7 +73,7 @@ visualization_msgs::Marker Clustering::GetPersonBoundingBoxes(const sensor_msgs:
   pcl::PassThrough<pcl::PointXYZ> pass;
   pass.setInputCloud (xyzCloudPtr_);
   pass.setFilterFieldName ("y");
-  pass.setFilterLimits (-2.0, 1.1);
+  pass.setFilterLimits (-2.0, 1.0);
   //pass.setFilterLimitsNegative (true);
   pass.filter (*xyzCloudPtrFiltered);
 
@@ -134,8 +134,20 @@ visualization_msgs::Marker Clustering::GetPersonBoundingBoxes(const sensor_msgs:
 
     // convert the pcl::PointCloud2 tpye to pcl::PointCloud<pcl::PointXYZRGB>
     //pcl::fromPCLPointCloud2(*cloudFilteredPtr, *xyzCloudPtr);
+
+
+    visualization_msgs::Marker max_object_marker;
+    max_object_marker.ns = "objects";
+    max_object_marker.id = id;
+    max_object_marker.header.frame_id = cloud_msg->header.frame_id;
+    max_object_marker.type = visualization_msgs::Marker::CUBE;   
+    max_object_marker.color.g = 1;
+    max_object_marker.color.a = 0.3;
+
+
     //pcl::fromPCLPointCloud2(*xyzCloudPtrRansacFiltered, *xyzCloudPtr);
     xyzCloudPtr = xyzCloudPtrRansacFiltered;
+    //GetAxisAlignedBoundingBox(xyzCloudPtr, &max_object_marker.pose, &max_object_marker.scale);
     // perform euclidean cluster segmentation to seporate individual objects
     // Create the KdTree object for the search method of the extraction
     pcl::search::KdTree<pcl::PointXYZ>::Ptr tree (new pcl::search::KdTree<pcl::PointXYZ>);
@@ -161,7 +173,6 @@ visualization_msgs::Marker Clustering::GetPersonBoundingBoxes(const sensor_msgs:
     int count = 0;
     float max;//to get cluster with maximum size
     visualization_msgs::MarkerArray marker_array_;
-    visualization_msgs::Marker max_object_marker;//to get object marker of maximum size cluster
     //sensor_msgs::PointCloud2 max_cloud_msg; 
     
     std::cout<<cluster_indices.size()<<"fasdf\n";
