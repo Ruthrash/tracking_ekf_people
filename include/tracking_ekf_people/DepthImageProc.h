@@ -117,15 +117,15 @@ void DepthImageProc::CreatePointCloud(const sensor_msgs::ImageConstPtr& depth_ms
             }
         }
         // Fill in XYZ
-        if(u>=bb.xmin && u<=bb.xmax && v>=bb.ymin && v<=bb.ymax)
-        {
+        //if(u>=bb.xmin && u<=bb.xmax && v>=bb.ymin && v<=bb.ymax)
+        //{
             //if(DepthTraits<T>::toMeters(depth) <= 1.2*avg_depth_row[(int)((bb.xmin + bb.xmax)/2)]     )
             //{
                 *iter_x = (u - center_x) * depth * constant_x;
                 *iter_y = (v - center_y) * depth * constant_y;
                 *iter_z = DepthTraits<T>::toMeters(depth);
             //}
-        }
+       // }
         }
     }
 }

@@ -36,7 +36,7 @@ void PersonDetection::SyncYOLODepthCB(const darknet_ros_msgs::BoundingBoxes::Con
                 //std::cout<<"rgb_info frame id "<<rgb_info_msg->header.frame_id<<" depth_info frame id"<<depth_info_msg->header.frame_id<<std::endl; 
                 std::string rgb_info_id = rgb_info.header.frame_id;
                 //rgb_info_msg->header.frame_id = rgb_info.erase(0,1);
-                std::string depth_info_id =     depth_info.header.frame_id;
+                std::string depth_info_id =  depth_info.header.frame_id;
                 //depth_info_msg->header.frame_id = depth_info.erase(0,1);
                 //depth_info = depth_info.erase(0,1);
                 //rgb_info = rgb_info.erase(0,1);

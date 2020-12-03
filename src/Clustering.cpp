@@ -140,6 +140,7 @@ visualization_msgs::Marker Clustering::GetPersonBoundingBoxes(const sensor_msgs:
     max_object_marker.ns = "objects";
     max_object_marker.id = id;
     max_object_marker.header.frame_id = cloud_msg->header.frame_id;
+    std::cout<<cloud_msg->header.frame_id<<"framess\n";
     max_object_marker.type = visualization_msgs::Marker::CUBE;   
     max_object_marker.color.g = 1;
     max_object_marker.color.a = 0.3;
