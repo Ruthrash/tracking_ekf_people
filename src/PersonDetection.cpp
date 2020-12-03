@@ -14,6 +14,7 @@ PersonDetection::PersonDetection(ros::NodeHandle &node) : Clustering(node), Dept
     tf_buffer_.reset( new tf2_ros::Buffer );
     tf_.reset( new tf2_ros::TransformListener(*tf_buffer_) );
     depth_reg_pub = node.advertise<sensor_msgs::Image>("image_rect", 1000);
+    depth_reg_info_pub = node.advertise<sensor_msgs::CameraInfo>("image_rect/camera_info", 1000);
 }
 
 
@@ -33,17 +34,8 @@ void PersonDetection::SyncYOLODepthCB(const darknet_ros_msgs::BoundingBoxes::Con
             Eigen::Affine3d depth_to_rgb;
             try
             {
-                //std::cout<<"rgb_info frame id "<<rgb_info_msg->header.frame_id<<" depth_info frame id"<<depth_info_msg->header.frame_id<<std::endl; 
-                std::string rgb_info_id = rgb_info.header.frame_id;
-                //rgb_info_msg->header.frame_id = rgb_info.erase(0,1);
-                std::string depth_info_id =  depth_info.header.frame_id;
-                //depth_info_msg->header.frame_id = depth_info.erase(0,1);
-                //depth_info = depth_info.erase(0,1);
-                //rgb_info = rgb_info.erase(0,1);
-                //rgb_info_msg->header.frame_id = rgb_info;
-                //depth_info_msg->header.frame_id = depth_info;
                 geometry_msgs::TransformStamped transform = tf_buffer_->lookupTransform (
-                                    rgb_info_id, depth_info_id,
+                                    rgb_info.header.frame_id, depth_info.header.frame_id,
                                     depth_msg->header.stamp);
 
                 tf::transformMsgToEigen(transform.transform, depth_to_rgb);
@@ -58,9 +50,6 @@ void PersonDetection::SyncYOLODepthCB(const darknet_ros_msgs::BoundingBoxes::Con
             // Allocate registered depth image
             sensor_msgs::ImagePtr registered_msg( new sensor_msgs::Image );
             registered_msg->header.stamp    = depth_msg->header.stamp;
-            //std::string rgb_info_id = rgb_info->header.frame_id;
-            //std::cout<<"ulalalaaa "<<rgb_info<<std::endl;
-            //rgb_info = rgb_info.erase(0,1);
             registered_msg->header.frame_id = rgb_info.header.frame_id;
             registered_msg->encoding        = depth_msg->encoding;
             
@@ -78,15 +67,12 @@ void PersonDetection::SyncYOLODepthCB(const darknet_ros_msgs::BoundingBoxes::Con
             if (depth_msg->encoding == sensor_msgs::image_encodings::TYPE_16UC1)
             {
                 RegisterDepthToRGB<uint16_t>(depth_msg, registered_msg, depth_to_rgb);
-                depth_reg_pub.publish(registered_msg);
-                CreatePointCloud<uint16_t>(registered_msg, cloud_msg, depth_model_, bb->bounding_boxes[i], 0.0);
-                
+                CreatePointCloud<uint16_t>(registered_msg, cloud_msg, rgb_model_, bb->bounding_boxes[i], 0.0);                
             }
             else if (depth_msg->encoding == sensor_msgs::image_encodings::TYPE_32FC1)
             {
                 RegisterDepthToRGB<float>(depth_msg, registered_msg, depth_to_rgb);
-                depth_reg_pub.publish(registered_msg);
-                CreatePointCloud<float>(registered_msg, cloud_msg, depth_model_, bb->bounding_boxes[i], 0.0);
+                CreatePointCloud<float>(registered_msg, cloud_msg, rgb_model_, bb->bounding_boxes[i], 0.0);
             }
             else
             {
@@ -94,21 +80,11 @@ void PersonDetection::SyncYOLODepthCB(const darknet_ros_msgs::BoundingBoxes::Con
                 return;
             }
             visualization_msgs::Marker marker_ = Clustering::GetPersonBoundingBoxes(cloud_msg, i);
-            //for(int j = 0; j < marker_array_d.markers.size() ; j++)
-             //   marker_array.markers.push_back(marker_array_d.markers[j]);
-            Clustering::PersonCloud(*cloud_msg);
-            //ros::Duration(0.5).sleep();
             marker_array.markers.push_back(marker_);
-           // marker_array.header = marker_.header;
         }
     }
+    std::cout<<"In time: "<< depth_msg->header.stamp.toSec()<<"Out time: "<<ros::Time::now().toSec()<<"\n";
     Clustering::PublishBoxesArray(marker_array);
-    std::cout<<marker_array.markers.size()<<"vountttt\n";
-    for(int idx = 0; idx <marker_array.markers.size(); idx++)
-    {
-        std::cout<<"box"<<marker_array.markers[idx].pose.position.x <<","<<marker_array.markers[idx].pose.position.y <<","<<marker_array.markers[idx].pose.position.z <<"\n";
-        std::cout<<"scale"<<marker_array.markers[idx].scale.x<<","<<marker_array.markers[idx].scale.y<<","<<marker_array.markers[idx].scale.z<<"\n"; 
-    }
   
 }
 

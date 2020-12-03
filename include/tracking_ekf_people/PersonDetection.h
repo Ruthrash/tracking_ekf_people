@@ -23,6 +23,8 @@
 #include "tracking_ekf_people/DepthImageProc.h"
 #include "tracking_ekf_people/Clustering.h"
 
+#include <image_transport/image_transport.h>
+#include <image_transport/subscriber_filter.h>
 
 class PersonDetection : public DepthImageProc, public Clustering
 {
@@ -33,9 +35,12 @@ public:
     PersonDetection(ros::NodeHandle &node);
 
 protected:
-    ros::Publisher depth_reg_pub;
+    ros::Publisher depth_reg_pub, depth_reg_info_pub;
 
 private:
+
+    image_transport::CameraPublisher pub_registered_;
+
     boost::shared_ptr<tf2_ros::TransformListener> tf_;
     boost::shared_ptr<tf2_ros::Buffer> tf_buffer_;
     message_filters::Subscriber<darknet_ros_msgs::BoundingBoxes> yolo_sync_sub;

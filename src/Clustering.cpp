@@ -140,7 +140,6 @@ visualization_msgs::Marker Clustering::GetPersonBoundingBoxes(const sensor_msgs:
     max_object_marker.ns = "objects";
     max_object_marker.id = id;
     max_object_marker.header.frame_id = cloud_msg->header.frame_id;
-    std::cout<<cloud_msg->header.frame_id<<"framess\n";
     max_object_marker.type = visualization_msgs::Marker::CUBE;   
     max_object_marker.color.g = 1;
     max_object_marker.color.a = 0.3;
@@ -176,7 +175,7 @@ visualization_msgs::Marker Clustering::GetPersonBoundingBoxes(const sensor_msgs:
     visualization_msgs::MarkerArray marker_array_;
     //sensor_msgs::PointCloud2 max_cloud_msg; 
     
-    std::cout<<cluster_indices.size()<<"fasdf\n";
+    //std::cout<<cluster_indices.size()<<"fasdf\n";
     // here, cluster_indices is a vector of indices for each cluster. iterate through each indices object to work with them seporately
     for (std::vector<pcl::PointIndices>::const_iterator it = cluster_indices.begin (); it != cluster_indices.end (); ++it)
     {
@@ -219,10 +218,8 @@ visualization_msgs::Marker Clustering::GetPersonBoundingBoxes(const sensor_msgs:
         //marker_array_.markers.push_back(object_marker);
 
     }
-    std::cout<<"Max obj "<<max_object_marker.header.frame_id; 
+    //std::cout<<"Max obj "<<max_object_marker.header.frame_id; 
     max_object_marker.header.stamp = ros::Time::now();
-    ros::Duration d(1);
-    max_object_marker.lifetime =d; 
     //
     //PublishBoxesArray(marker_array_);
     return max_object_marker;

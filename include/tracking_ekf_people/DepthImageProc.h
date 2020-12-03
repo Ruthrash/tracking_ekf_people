@@ -92,9 +92,9 @@ void DepthImageProc::CreatePointCloud(const sensor_msgs::ImageConstPtr& depth_ms
     const T* avg_depth_row = reinterpret_cast<const T*>(&depth_msg->data[0]);
     
     int row_step = depth_msg->step / sizeof(T);
-    avg_depth_row = avg_depth_row + (int)(row_step*((bb.ymin + bb.ymax)/2));//*((bb.ymin + bb.ymax)/2);
-    std::cout<<"boxes:"<<bb.xmin<<", "<<bb.xmax<<", "<<bb.ymin<<", "<<bb.ymax<<"\n";
-    std::cout<<"iter: "<<(int)cloud_msg->height<<", "<<(int)cloud_msg->width<<"\n";
+    //avg_depth_row = avg_depth_row + (int)(row_step*((bb.ymin + bb.ymax)/2));//*((bb.ymin + bb.ymax)/2);
+    //std::cout<<"boxes:"<<bb.xmin<<", "<<bb.xmax<<", "<<bb.ymin<<", "<<bb.ymax<<"\n";
+    //std::cout<<"iter: "<<(int)cloud_msg->height<<", "<<(int)cloud_msg->width<<"\n";
     for (int v = 0; v < (int)cloud_msg->height; ++v, depth_row += row_step)
     //for (int v = (int)bb.ymin; v <= (int)bb.ymax; ++v, depth_row += row_step)
     {
@@ -117,15 +117,15 @@ void DepthImageProc::CreatePointCloud(const sensor_msgs::ImageConstPtr& depth_ms
             }
         }
         // Fill in XYZ
-        //if(u>=bb.xmin && u<=bb.xmax && v>=bb.ymin && v<=bb.ymax)
-        //{
+        if(u>=bb.xmin && u<=bb.xmax && v>=bb.ymin && v<=bb.ymax)
+        {
             //if(DepthTraits<T>::toMeters(depth) <= 1.2*avg_depth_row[(int)((bb.xmin + bb.xmax)/2)]     )
             //{
                 *iter_x = (u - center_x) * depth * constant_x;
                 *iter_y = (v - center_y) * depth * constant_y;
                 *iter_z = DepthTraits<T>::toMeters(depth);
             //}
-       // }
+        }
         }
     }
 }
