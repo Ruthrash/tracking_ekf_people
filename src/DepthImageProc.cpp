@@ -3,8 +3,12 @@
 
 DepthImageProc::DepthImageProc(ros::NodeHandle &node)
 {
-    depth_info_sub = node.subscribe("/pepper_robot/camera/depth/camera_info", 1, &DepthImageProc::DepthInfoCB, this);
-    rgb_info_sub = node.subscribe("/pepper_robot/camera/front/camera_info", 1, &DepthImageProc::RGBInfoCB, this);
+    //depth_info_sub = node.subscribe("/pepper_robot/camera/depth/camera_info", 1, &DepthImageProc::DepthInfoCB, this);
+    //rgb_info_sub = node.subscribe("/pepper_robot/camera/front/camera_info", 1, &DepthImageProc::RGBInfoCB, this);
+
+    depth_info_sub = node.subscribe("/camera/rgb/camera_info", 1, &DepthImageProc::DepthInfoCB, this);
+    rgb_info_sub = node.subscribe("/camera/rgb/camera_info", 1, &DepthImageProc::RGBInfoCB, this);
+
     depth_info.header.frame_id = "";
     rgb_info.header.frame_id = "";
 

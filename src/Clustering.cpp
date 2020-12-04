@@ -52,7 +52,7 @@ visualization_msgs::Marker Clustering::GetPersonBoundingBoxes(const sensor_msgs:
 
     // Perform voxel grid downsampling filtering
     pcl::VoxelGrid<pcl::PCLPointCloud2> sor;
-    sor.setInputCloud (cloudPtr); sor.setLeafSize (0.03, 0.03, 0.03); sor.filter (*cloudFilteredPtr);//cloudFilteredPtr has voxelised pointcloud
+    sor.setInputCloud (cloudPtr); sor.setLeafSize (0.05, 0.05, 0.05); sor.filter (*cloudFilteredPtr);//cloudFilteredPtr has voxelised pointcloud
 
 
 
@@ -73,7 +73,7 @@ visualization_msgs::Marker Clustering::GetPersonBoundingBoxes(const sensor_msgs:
   pcl::PassThrough<pcl::PointXYZ> pass;
   pass.setInputCloud (xyzCloudPtr_);
   pass.setFilterFieldName ("y");
-  pass.setFilterLimits (-2.0, 1.0);
+  pass.setFilterLimits (-2.0, 1.5);
   //pass.setFilterLimitsNegative (true);
   pass.filter (*xyzCloudPtrFiltered);
 
@@ -220,6 +220,11 @@ visualization_msgs::Marker Clustering::GetPersonBoundingBoxes(const sensor_msgs:
     }
     //std::cout<<"Max obj "<<max_object_marker.header.frame_id; 
     max_object_marker.header.stamp = ros::Time::now();
+    //std::cout<<"size "<<abs(max_object_marker.scale.x+max_object_marker.scale.y+max_object_marker.scale.z)<<"\n";
+    //if (abs(max_object_marker.scale.x+max_object_marker.scale.y+max_object_marker.scale.z) == 0.0)
+    //{
+     //   GetAxisAlignedBoundingBox(xyzCloudPtr, &max_object_marker.pose, &max_object_marker.scale);
+    //}
     //
     //PublishBoxesArray(marker_array_);
     return max_object_marker;

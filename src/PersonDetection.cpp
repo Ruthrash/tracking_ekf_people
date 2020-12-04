@@ -6,8 +6,8 @@ PersonDetection::~PersonDetection(){}
 PersonDetection::PersonDetection(ros::NodeHandle &node) : Clustering(node), DepthImageProc(node)
 {
     yolo_sync_sub.subscribe(node, "/darknet_ros/bounding_boxes",300);
-    depth_sync_sub.subscribe(node, "/pepper_robot/camera/depth/image_raw",300);
-    //depth_sync_sub.subscribe(node, "/camera/depth_registered/image",300);
+    //depth_sync_sub.subscribe(node, "/pepper_robot/camera/depth/image_raw",300);
+    depth_sync_sub.subscribe(node, "/camera/depth/image",300);
     sync_.reset(new Sync(MySyncPolicy(3000), yolo_sync_sub, depth_sync_sub));
     sync_->registerCallback(boost::bind(&PersonDetection::SyncYOLODepthCB, this, _1, _2));
     //depth_info_sub = node.subscribe("/camera/depth_registered/camera_info", 1, &PersonDetection::DepthInfoCB, this);
@@ -22,6 +22,7 @@ PersonDetection::PersonDetection(ros::NodeHandle &node) : Clustering(node), Dept
 
 void PersonDetection::SyncYOLODepthCB(const darknet_ros_msgs::BoundingBoxes::ConstPtr& bb, const sensor_msgs::Image::ConstPtr& depth_msg)
 {
+    ros::Time start = ros::Time::now();
     visualization_msgs::MarkerArray marker_array;
     std::cout<<"running corrections \n";
     int count = 0;
@@ -66,24 +67,25 @@ void PersonDetection::SyncYOLODepthCB(const darknet_ros_msgs::BoundingBoxes::Con
 
             if (depth_msg->encoding == sensor_msgs::image_encodings::TYPE_16UC1)
             {
-                RegisterDepthToRGB<uint16_t>(depth_msg, registered_msg, depth_to_rgb);
-                CreatePointCloud<uint16_t>(registered_msg, cloud_msg, rgb_model_, bb->bounding_boxes[i], 0.0);                
+                //RegisterDepthToRGB<uint16_t>(depth_msg, registered_msg, depth_to_rgb);
+                CreatePointCloud<uint16_t>(depth_msg, cloud_msg, rgb_model_, bb->bounding_boxes[i], 0.0);                
             }
             else if (depth_msg->encoding == sensor_msgs::image_encodings::TYPE_32FC1)
             {
-                RegisterDepthToRGB<float>(depth_msg, registered_msg, depth_to_rgb);
-                CreatePointCloud<float>(registered_msg, cloud_msg, rgb_model_, bb->bounding_boxes[i], 0.0);
+                //RegisterDepthToRGB<float>(depth_msg, registered_msg, depth_to_rgb);
+                CreatePointCloud<float>(depth_msg, cloud_msg, rgb_model_, bb->bounding_boxes[i], 0.0);
             }
             else
             {
                 ROS_INFO("Depth image has unsupported encoding [%s]", depth_msg->encoding.c_str());
                 return;
             }
+            Clustering::PersonCloud(*cloud_msg);
             visualization_msgs::Marker marker_ = Clustering::GetPersonBoundingBoxes(cloud_msg, i);
             marker_array.markers.push_back(marker_);
         }
     }
-    std::cout<<"In time: "<< depth_msg->header.stamp.toSec()<<"Out time: "<<ros::Time::now().toSec()<<"\n";
+    std::cout<<"In time: "<< start.toSec()<<"Out time: "<<ros::Time::now().toSec()<<"Time difference "<<ros::Time::now().toSec() - start.toSec()  <<"\n";
     Clustering::PublishBoxesArray(marker_array);
   
 }
